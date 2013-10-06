@@ -11,7 +11,7 @@ def version():
 setup(name='pybenchmarks',
       description='Automate benchmark tables',
       long_description=open('README.rst').read(),
-      url='http://pchanial.github.com/pybenchmarks',
+      url='http://github.com/pchanial/pybenchmarks',
       author='Pierre Chanial',
       author_email='pierre.chanial@gmail.com',
       packages=['pybenchmarks'],
