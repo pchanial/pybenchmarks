@@ -1,6 +1,6 @@
-===========
-PyBenchmark
-===========
+============
+PyBenchmarks
+============
 
 Automate the creation of benchmark tables.
 
@@ -15,6 +15,7 @@ Examples
 ========
 
 >>> import numpy as np
+>>> from pybenchmarks import benchmark
 >>> def f(dtype, n=10):
 ...     return np.zeros(n, dtype)
 >>> b = benchmark(f, (int, float), n=(10, 100))
