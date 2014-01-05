@@ -82,9 +82,9 @@ def benchmark(stmt, *args, **keywords):
         raise TypeError(
             'The argument setup is neither a string nor a callable.')
 
-    # ensure args is a sequence of sequance
+    # ensure args is a sequence of sequences
     args = [a if isinstance(a, (list, tuple)) else [a] for a in args]
-    # ensure keywords is a dict of sequance
+    # ensure keywords is a dict of sequences
     keywords = dict((str(k), v if isinstance(v, (list, tuple)) else [v])
                     for k, v in keywords.items())
 
