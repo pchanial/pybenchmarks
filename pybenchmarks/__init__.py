@@ -9,7 +9,7 @@ import timeit
 from collections import OrderedDict
 
 __all__ = ['benchmark']
-__version__ = '1.2'
+__version__ = '1.3'
 
 
 def benchmark(stmt, *args, **keywords):
@@ -85,7 +85,7 @@ def benchmark(stmt, *args, **keywords):
             'The argument setup is neither a string nor a callable.')
 
     # ensure args is a sequence of sequences
-    args = [a if isinstance(a, (list, tuple)) else [a] for a in args]
+    args = tuple(a if isinstance(a, (list, tuple)) else [a] for a in args)
     # ensure keywords is a dict of sequences
     keywords = OrderedDict((str(k), keywords[k]
                             if isinstance(keywords[k], (list, tuple))
@@ -99,6 +99,7 @@ def benchmark(stmt, *args, **keywords):
             tuple(len(v) for v in keywords.values())
 
     result = {
+        'arguments': args + tuple(keywords.values()),
         'info': np.empty(shape, 'S256'),
         'time': np.empty(shape)}
 
