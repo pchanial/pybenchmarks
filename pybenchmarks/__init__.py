@@ -3,11 +3,13 @@ from __future__ import print_function
 
 import gc
 import itertools
+import numpy as np
 import os
 import timeit
+from collections import OrderedDict
 
 __all__ = ['benchmark']
-__version__ = '1.1'
+__version__ = '1.2'
 
 
 def benchmark(stmt, *args, **keywords):
@@ -85,15 +87,21 @@ def benchmark(stmt, *args, **keywords):
     # ensure args is a sequence of sequences
     args = [a if isinstance(a, (list, tuple)) else [a] for a in args]
     # ensure keywords is a dict of sequences
-    keywords = dict((str(k), v if isinstance(v, (list, tuple)) else [v])
-                    for k, v in keywords.items())
+    keywords = OrderedDict((str(k), keywords[k]
+                            if isinstance(keywords[k], (list, tuple))
+                            else [keywords[k]])
+                           for k in sorted(keywords.keys()))
 
     iterargs = itertools.product(*args)
     iterkeys = _iterkeywords(keywords)
     iterinputs = itertools.product(iterargs, iterkeys)
+    shape = tuple(len(_) for _ in args) + \
+            tuple(len(v) for v in keywords.values())
 
-    result = {'info': [],
-              'time': []}
+    result = {
+        'info': np.empty(shape, 'S256'),
+        'time': np.empty(shape)}
+
     try:
         memory = memory_usage()
     except IOError:
@@ -101,9 +109,9 @@ def benchmark(stmt, *args, **keywords):
         memory = {}
     else:
         do_memory = True
-        result.update(dict((k, []) for k in memory))
+        result.update(dict((k, np.empty(shape)) for k in memory))
 
-    for arg, keyword in iterinputs:
+    for iresult, (arg, keyword) in enumerate(iterinputs):
 
         stmt_ = _replace(stmt, arg, keyword)
         setup_ = _replace(setup, arg, keyword)
@@ -157,10 +165,10 @@ def benchmark(stmt, *args, **keywords):
               ' ' + ', '.join([k + ':' + str(v) + 'MiB'
                                for k, v in memory.items()])))
 
-        result['info'].append(info)
-        result['time'].append(best / number)
+        result['info'].ravel()[iresult] = info
+        result['time'].ravel()[iresult] = best / number
         for k in memory:
-            result[k].append(memory[k])
+            result[k].ravel()[iresult] = memory[k]
 
     return result
 
@@ -211,13 +219,13 @@ def memory_usage(keys=('VmRSS', 'VmData', 'VmSize'), since=None):
 def _get_info(args, keywords):
     id = ''
     if len(args) > 0:
-        id = ','.join(repr(a) for a in args)
+        id = ', '.join(repr(a) for a in args)
     else:
         id = ''
     if len(keywords) > 0:
         if id != '':
-            id += ','
-        id += ','.join(str(k) + '=' + repr(v)
+            id += ', '
+        id += ', '.join(str(k) + '=' + repr(v)
                        for k, v in keywords.items())
     return id
 
