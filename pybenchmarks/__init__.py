@@ -9,7 +9,9 @@ import timeit
 from collections import OrderedDict
 
 __all__ = ['benchmark']
-__version__ = '1.3'
+__version__ = '2.0'
+
+keyword = {}
 
 
 def benchmark(stmt, *args, **keywords):
@@ -17,9 +19,9 @@ def benchmark(stmt, *args, **keywords):
     Automate the creation of benchmark tables.
 
     This function times a code snippet by iterating through sequences
-    of input arguments and keywords. It returns a dictionary containing
-    the elapsed time (all platforms) and memory usage (linux only)
-    for each combination of input arguments and keywords.
+    of input variables. It returns a dictionary containing the elapsed time
+    (all platforms) and memory usage (linux only) for each combination of
+    the input variables.
 
     Parameters
     ----------
@@ -42,20 +44,15 @@ def benchmark(stmt, *args, **keywords):
     ...     return np.zeros(n, dtype)
     >>> b = benchmark(f, (int, float), n=(10, 100))
 
-    >>> b = benchmark('sleep(1)', setup='from time import sleep')
+    >>> b = benchmark('sleep(t)', t=(1, 2, 3), setup='from time import sleep')
 
     >>> shapes = (10, 100, 1000)
-    >>> b = benchmark('np.dot(a, a)', shapes,
+    >>> b = benchmark('np.dot(a, a)', shape=shapes,
     ...               setup='import numpy as np;'
-    ...                     'a = np.random.random_sample(*args)')
+    ...                     'a = np.random.random_sample(shape)')
 
-    >>> b = benchmark('np.dot(a, a)', size=shapes,
+    >>> b = benchmark('np.dot(a, b)', m=shapes, n=shapes,
     ...               setup='import numpy as np;'
-    ...                     'a = np.random.random_sample(**keywords)')
-
-    >>> b = benchmark('np.dot(a, b)', shapes, shapes,
-    ...               setup='import numpy as np;'
-    ...                     'm, n = *args;'
     ...                     'a = np.random.random_sample((m, n));'
     ...                     'b = np.random.random_sample(n)')
 
@@ -64,8 +61,8 @@ def benchmark(stmt, *args, **keywords):
     ...         self.a = 2 * np.ones(n, dtype)
     ...     def run(self):
     ...         np.sqrt(self.a)
-    >>> b = benchmark('a.run()', ('int', 'float'), n=(1, 10),
-    ...               setup='from __main__ import A; a=A(*args, **keywords)')
+    >>> b = benchmark('a.run()', dtype=('int', 'float'), n=(1, 10),
+    ...               setup='from __main__ import A; a = A(dtype, n=n)')
 
     Overhead:
     >>> def f():
@@ -73,6 +70,7 @@ def benchmark(stmt, *args, **keywords):
     >>> b = benchmark(f)
 
     """
+    global keyword
 
     if not callable(stmt) and not isinstance(stmt, str):
         raise TypeError(
@@ -83,6 +81,8 @@ def benchmark(stmt, *args, **keywords):
     if not callable(setup) and not isinstance(setup, str):
         raise TypeError(
             'The argument setup is neither a string nor a callable.')
+    if isinstance(stmt, str) and len(args) > 0:
+        raise ValueError('Variables should be passed through keywords.')
 
     # ensure args is a sequence of sequences
     args = tuple(a if isinstance(a, (list, tuple)) else [a] for a in args)
@@ -98,8 +98,12 @@ def benchmark(stmt, *args, **keywords):
     shape = tuple(len(_) for _ in args) + \
             tuple(len(v) for v in keywords.values())
 
+    variables = OrderedDict()
+    if len(args) > 0:
+        variables['*args'] = args
+    variables.update(keywords)
     result = {
-        'arguments': args + tuple(keywords.values()),
+        'variables': variables,
         'info': np.empty(shape, 'S256'),
         'time': np.empty(shape)}
 
@@ -112,10 +116,14 @@ def benchmark(stmt, *args, **keywords):
         do_memory = True
         result.update(dict((k, np.empty(shape)) for k in memory))
 
+    if len(keywords) > 0:
+        setup_init = (
+            'from pybenchmarks import keyword;' +
+            ';\n'.join("{0}=keyword['{0}']".format(k) for k in keywords) +
+            ';\n')
+
     for iresult, (arg, keyword) in enumerate(iterinputs):
 
-        stmt_ = _replace(stmt, arg, keyword)
-        setup_ = _replace(setup, arg, keyword)
         if callable(stmt):
             class wrapper(object):
                 def __call__(self):
@@ -125,7 +133,7 @@ def benchmark(stmt, *args, **keywords):
             w.keywords = keyword
             t = timeit.Timer(w, setup=setup)
         else:
-            t = timeit.Timer(stmt_, setup=setup_)
+            t = timeit.Timer(stmt, setup=setup_init + setup)
 
         # determine number so that 0.2 <= total time < 2.0
         for i in range(10):
@@ -227,19 +235,8 @@ def _get_info(args, keywords):
         if id != '':
             id += ', '
         id += ', '.join(str(k) + '=' + repr(v)
-                       for k, v in keywords.items())
+                        for k, v in keywords.items())
     return id
-
-
-def _replace(s, arg, keyword):
-    if not isinstance(s, str):
-        return s
-    while '*args' in s:
-        s = s.replace('*args', ','.join(repr(a) for a in arg))
-    while '**keywords' in s:
-        s = s.replace('**keywords',
-                      ','.join(k+'='+repr(v) for k, v in keyword.items()))
-    return s
 
 
 def _iterkeywords(keywords):
