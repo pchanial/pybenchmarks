@@ -28,15 +28,15 @@ def benchmark(stmts, *args, **keywords):
 
     Parameters
     ----------
-    stmts : callable or string, or sequence of
-        The function(s) or snippet(s) to be timed. For strings, the keywords
-        are iterated and their values are passed to the code string by using
-        the keyword name.
+    stmts : string, or sequence of
+        The code snippet(s) to be timed. The input keywords are iterated
+        and their values are passed to the code string by using the keyword
+        name.
     repeat : int, optional
         Number of times the timing is repeated (default: 3).
-    setup : callable or string, optional
-        Initialisation before timing. In case of a string, arguments and
-        keywords are passed with the same mechanism as the stmt argument.
+    setup : string, optional
+        Initialisation before timing. The input keywords are passed with
+        the same mechanism as the stmt argument.
     memory_usage : boolean, optional
         If True, print memory usage (default is False)
 
@@ -61,18 +61,8 @@ def benchmark(stmts, *args, **keywords):
     ...                     'a = np.random.random_sample((m, n));'
     ...                     'b = np.random.random_sample(n)')
 
-    >>> class A():
-    ...     def __init__(self, dtype, n=10):
-    ...         self.a = 2 * np.ones(n, dtype)
-    ...     def run(self):
-    ...         np.sqrt(self.a)
-    >>> b = benchmark('a.run()', dtype=('int', 'float'), n=(1, 10),
-    ...               setup='from __main__ import A; a = A(dtype, n=n)')
-
     Overhead:
-    >>> def f():
-    ...     pass
-    >>> b = benchmark(f)
+    >>> b = benchmark('pass')
 
     """
     global keyword
@@ -81,13 +71,13 @@ def benchmark(stmts, *args, **keywords):
         stmts = (stmts,)
     if any(not callable(_) and not isinstance(_, str) for _ in stmts):
         raise TypeError(
-            'The argument stmts does not consist of strings or callables.')
+            'The argument stmts is not a string not a sequence of strings.')
 
     repeat = keywords.pop('repeat', 3)
     setup = keywords.pop('setup', 'pass')
     if not callable(setup) and not isinstance(setup, str):
         raise TypeError(
-            'The argument setup is neither a string nor a callable.')
+            'The argument setup is not string.')
     if isinstance(stmts[0], str) and len(args) > 0:
         raise ValueError('Variables should be passed through keywords.')
     do_memory = keywords.pop('memory_usage', False)
