@@ -41,6 +41,8 @@ def benchmark(stmts, *args, **keywords):
         the same mechanism as the stmt argument.
     memory_usage : boolean, optional
         If True, print memory usage (default is False)
+    verbose : boolean, optional
+        If True, print number of loops and repeats.
 
     Examples
     --------
@@ -86,6 +88,7 @@ def benchmark(stmts, *args, **keywords):
     maxloop = keywords.pop('maxloop', 100)
     if maxloop < 1:
         raise ValueError('Invalid value for maxloop.')
+    verbose = keywords.pop('verbose', False)
 
     # ensure args is a sequence of sequences
     args = tuple(a if isinstance(a, (list, tuple)) else [a] for a in args)
@@ -178,8 +181,12 @@ def benchmark(stmts, *args, **keywords):
             unit = 's'
             value = usec / 1000000
 
-        msg = '{0}{1}{2} loops, best of {3}: {4:.2f} {5} per loop.'.format(
-            info, ': ' if info else '', number, repeat, value, unit)
+        if verbose:
+            msg = '{0}{1}{2} loops, best of {3}: {4:.2f} {5} per loop.'.format(
+                info, ': ' if info else '', number, repeat, value, unit)
+        else:
+            msg = '{0}{1}{2:.2f} {3}.'.format(info, ': ' if info else '',
+                                              value, unit)
         if do_memory:
             msg += ' ' + ', '.join(k + ':' + str(v) + 'MiB'
                                    for k, v in memory.items())
