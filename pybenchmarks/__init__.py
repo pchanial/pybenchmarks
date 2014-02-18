@@ -34,6 +34,8 @@ def benchmark(stmts, *args, **keywords):
         name.
     repeat : int, optional
         Number of times the timing is repeated (default: 3).
+    maxloop : int, optional
+        Maximum number of loops (default: 100).
     setup : string, optional
         Initialisation before timing. The input keywords are passed with
         the same mechanism as the stmt argument.
@@ -81,6 +83,9 @@ def benchmark(stmts, *args, **keywords):
     if isinstance(stmts[0], str) and len(args) > 0:
         raise ValueError('Variables should be passed through keywords.')
     do_memory = keywords.pop('memory_usage', False)
+    maxloop = keywords.pop('maxloop', 100)
+    if maxloop < 1:
+        raise ValueError('Invalid value for maxloop.')
 
     # ensure args is a sequence of sequences
     args = tuple(a if isinstance(a, (list, tuple)) else [a] for a in args)
@@ -135,18 +140,21 @@ def benchmark(stmts, *args, **keywords):
         else:
             t = timeit.Timer(stmt, setup=setup_init + setup)
 
-        # determine number so that 0.2 <= total time < 2.0
+        # determine number so that 0.1 <= total time < 1.0
         for i in range(10):
             number = 10**i
-            x = t.timeit(number)
-            if x >= 0.2:
+            if number > maxloop:
                 break
+            x = t.timeit(number)
+            if x >= 0.1:
+                break
+        number = min(number, maxloop)
 
         # actual runs
         gc.collect()
         if do_memory:
             memory = memory_usage()
-        if number > 1 or x <= 2:
+        if number > 1 or x < 0.1:
             r = t.repeat(repeat, number)
         else:
             r = t.repeat(repeat-1, number)
