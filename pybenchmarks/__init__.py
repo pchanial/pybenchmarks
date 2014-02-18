@@ -37,6 +37,8 @@ def benchmark(stmts, *args, **keywords):
     setup : callable or string, optional
         Initialisation before timing. In case of a string, arguments and
         keywords are passed with the same mechanism as the stmt argument.
+    memory_usage : boolean, optional
+        If True, print memory usage (default is False)
 
     Examples
     --------
@@ -88,6 +90,7 @@ def benchmark(stmts, *args, **keywords):
             'The argument setup is neither a string nor a callable.')
     if isinstance(stmts[0], str) and len(args) > 0:
         raise ValueError('Variables should be passed through keywords.')
+    do_memory = keywords.pop('memory_usage', False)
 
     # ensure args is a sequence of sequences
     args = tuple(a if isinstance(a, (list, tuple)) else [a] for a in args)
@@ -115,14 +118,13 @@ def benchmark(stmts, *args, **keywords):
         'info': np.zeros(nbenches, 'S256'),
         'time': np.zeros(nbenches)}
 
-    try:
-        memory = memory_usage()
-    except IOError:
-        do_memory = False
-        memory = {}
-    else:
-        do_memory = True
-        result.update(dict((k, np.zeros(nbenches)) for k in memory))
+    if do_memory:
+        try:
+            memory = memory_usage()
+        except IOError:
+            do_memory = False
+        else:
+            result.update(dict((k, np.zeros(nbenches)) for k in memory))
 
     if len(keywords) > 0:
         setup_init = (
@@ -177,20 +179,25 @@ def benchmark(stmts, *args, **keywords):
         else:
             unit = 's'
             value = usec / 1000000
-        print('{0}{1}{2} loops, best of {3}: {4:.2f} {5} per loop.{6}'.format(
-              info, ': ' if info else '', number, repeat, value, unit,
-              ' ' + ', '.join([k + ':' + str(v) + 'MiB'
-                               for k, v in memory.items()])))
+
+        msg = '{0}{1}{2} loops, best of {3}: {4:.2f} {5} per loop.'.format(
+            info, ': ' if info else '', number, repeat, value, unit)
+        if do_memory:
+            msg += ' ' + ', '.join(k + ':' + str(v) + 'MiB'
+                                   for k, v in memory.items())
+        print(msg)
 
         result['info'][iresult] = info
         result['time'][iresult] = best / number
-        for k in memory:
-            result[k][iresult] = memory[k]
+        if do_memory:
+            for k in memory:
+                result[k][iresult] = memory[k]
 
     result['info'] = result['info'].reshape(shape).T
     result['time'] = result['time'].reshape(shape).T
-    for k in memory:
-        result[k] = result[k].reshape(shape).T
+    if do_memory:
+        for k in memory:
+            result[k] = result[k].reshape(shape).T
 
     return result
 
