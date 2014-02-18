@@ -6,31 +6,32 @@ import itertools
 import numpy as np
 import os
 import timeit
-from collections import OrderedDict
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 __all__ = ['benchmark']
-__version__ = '2.0'
+__version__ = '2.1'
 
 keyword = {}
 
 
-def benchmark(stmt, *args, **keywords):
+def benchmark(stmts, *args, **keywords):
     """
     Automate the creation of benchmark tables.
 
-    This function times a code snippet by iterating through sequences
-    of input variables. It returns a dictionary containing the elapsed time
-    (all platforms) and memory usage (linux only) for each combination of
-    the input variables.
+    This function times one or more code snippets by iterating through
+    sequences of keyed input variables. It returns a dictionary containing
+    the elapsed time (all platforms) and memory usage (linux only) for each
+    combination of the input variables.
 
     Parameters
     ----------
-    stmt : callable or string
-        The function or snippet to be timed. If is it a string, the arguments
-        are matched by '*args' and the keywords by '**keywords'.
-        Caveat: these must be interpreted correctly through their repr.
-        Otherwise, they should be passed as a string (then both stmt and setup
-        should be a string). See examples below.
+    stmts : callable or string, or sequence of
+        The function(s) or snippet(s) to be timed. For strings, the keywords
+        are iterated and their values are passed to the code string by using
+        the keyword name.
     repeat : int, optional
         Number of times the timing is repeated (default: 3).
     setup : callable or string, optional
@@ -42,9 +43,11 @@ def benchmark(stmt, *args, **keywords):
     >>> import numpy as np
     >>> def f(dtype, n=10):
     ...     return np.zeros(n, dtype)
-    >>> b = benchmark(f, (int, float), n=(10, 100))
+    >>> b = benchmark('f(dtype, n=n)', dtype=(int, float), n=(10, 100, 1000),
+    ...               setup='from __main__ import f')
 
-    >>> b = benchmark('sleep(t)', t=(1, 2, 3), setup='from time import sleep')
+    >>> b = benchmark('sleep(t)', t=(.1, .2, .3),
+    ...                setup='from time import sleep')
 
     >>> shapes = (10, 100, 1000)
     >>> b = benchmark('np.dot(a, a)', shape=shapes,
@@ -72,16 +75,18 @@ def benchmark(stmt, *args, **keywords):
     """
     global keyword
 
-    if not callable(stmt) and not isinstance(stmt, str):
+    if callable(stmts) or isinstance(stmts, str):
+        stmts = (stmts,)
+    if any(not callable(_) and not isinstance(_, str) for _ in stmts):
         raise TypeError(
-            'The argument stmt is neither a string nor a callable.')
+            'The argument stmts does not consist of strings or callables.')
 
     repeat = keywords.pop('repeat', 3)
     setup = keywords.pop('setup', 'pass')
     if not callable(setup) and not isinstance(setup, str):
         raise TypeError(
             'The argument setup is neither a string nor a callable.')
-    if isinstance(stmt, str) and len(args) > 0:
+    if isinstance(stmts[0], str) and len(args) > 0:
         raise ValueError('Variables should be passed through keywords.')
 
     # ensure args is a sequence of sequences
@@ -94,18 +99,21 @@ def benchmark(stmt, *args, **keywords):
 
     iterargs = itertools.product(*args)
     iterkeys = _iterkeywords(keywords)
-    iterinputs = itertools.product(iterargs, iterkeys)
-    shape = tuple(len(_) for _ in args) + \
-            tuple(len(v) for v in keywords.values())
+    iterinputs = itertools.product(iterargs, iterkeys, stmts)
+    shape = tuple(len(_) for _ in reversed(args)) + \
+            tuple(len(_) for _ in reversed(keywords.values())) + \
+            (len(stmts),)
+    nbenches = np.product(shape)
 
-    variables = OrderedDict()
+    variables = OrderedDict({'stmts': stmts})
     if len(args) > 0:
         variables['*args'] = args
     variables.update(keywords)
     result = {
         'variables': variables,
-        'info': np.empty(shape, 'S256'),
-        'time': np.empty(shape)}
+        'setup': setup,
+        'info': np.zeros(nbenches, 'S256'),
+        'time': np.zeros(nbenches)}
 
     try:
         memory = memory_usage()
@@ -114,7 +122,7 @@ def benchmark(stmt, *args, **keywords):
         memory = {}
     else:
         do_memory = True
-        result.update(dict((k, np.empty(shape)) for k in memory))
+        result.update(dict((k, np.zeros(nbenches)) for k in memory))
 
     if len(keywords) > 0:
         setup_init = (
@@ -122,7 +130,7 @@ def benchmark(stmt, *args, **keywords):
             ';\n'.join("{0}=keyword['{0}']".format(k) for k in keywords) +
             ';\n')
 
-    for iresult, (arg, keyword) in enumerate(iterinputs):
+    for iresult, (arg, keyword, stmt) in enumerate(iterinputs):
 
         if callable(stmt):
             class wrapper(object):
@@ -155,7 +163,7 @@ def benchmark(stmt, *args, **keywords):
         if do_memory:
             memory = memory_usage(since=memory)
 
-        info = _get_info(arg, keyword)
+        info = _get_info(iresult, len(stmts), arg, keyword)
         usec = best * 1e6 / number
         if usec < 1:
             unit = 'ns'
@@ -174,10 +182,15 @@ def benchmark(stmt, *args, **keywords):
               ' ' + ', '.join([k + ':' + str(v) + 'MiB'
                                for k, v in memory.items()])))
 
-        result['info'].ravel()[iresult] = info
-        result['time'].ravel()[iresult] = best / number
+        result['info'][iresult] = info
+        result['time'][iresult] = best / number
         for k in memory:
-            result[k].ravel()[iresult] = memory[k]
+            result[k][iresult] = memory[k]
+
+    result['info'] = result['info'].reshape(shape).T
+    result['time'] = result['time'].reshape(shape).T
+    for k in memory:
+        result[k] = result[k].reshape(shape).T
 
     return result
 
@@ -225,22 +238,19 @@ def memory_usage(keys=('VmRSS', 'VmData', 'VmSize'), since=None):
     return result
 
 
-def _get_info(args, keywords):
-    id = ''
-    if len(args) > 0:
-        id = ', '.join(repr(a) for a in args)
+def _get_info(istmt, nstmts, args, keywords):
+    if nstmts > 1:
+        length_stmt = str(len(str(nstmts)))
+        info = ('{0:' + length_stmt + '}: ').format(istmt % nstmts + 1)
     else:
-        id = ''
-    if len(keywords) > 0:
-        if id != '':
-            id += ', '
-        id += ', '.join(str(k) + '=' + repr(v)
-                        for k, v in keywords.items())
-    return id
+        info = ''
+    info += ', '.join([repr(a) for a in args] +
+                      ['{0}={1!r}'.format(k, v) for k, v in keywords.items()])
+    return info
 
 
 def _iterkeywords(keywords):
-    keys = keywords.keys()
-    itervalues = itertools.product(*keywords.values())
+    keys = keywords.keys()[::-1]
+    itervalues = itertools.product(*keywords.values()[::-1])
     for values in itervalues:
-        yield dict((k, v) for k, v in zip(keys, values))
+        yield OrderedDict((k, v) for k, v in zip(keys, values)[::-1])
