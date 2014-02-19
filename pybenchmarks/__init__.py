@@ -1,3 +1,7 @@
+"""
+Module to easily create benchmark tables.
+
+"""
 from __future__ import division
 from __future__ import print_function
 
@@ -47,23 +51,29 @@ def benchmark(stmts, *args, **keywords):
     Examples
     --------
     >>> import numpy as np
-    >>> def f(dtype, n=10):
-    ...     return np.zeros(n, dtype)
-    >>> b = benchmark('f(dtype, n=n)', dtype=(int, float), n=(10, 100, 1000),
-    ...               setup='from __main__ import f')
+    >>> from pybenchmarks import benchmark
+    >>> f1 = np.empty
+    >>> f2 = np.ones
+    >>> b = benchmark(['f1(n, dtype=dtype)', 'f2(n, dtype=dtype)'],
+    ...               dtype=(int, complex), n=(100, 10000, 1000000),
+    ...               setup='from __main__ import f1, f2')
 
-    >>> b = benchmark('sleep(t)', t=(.1, .2, .3),
-    ...                setup='from time import sleep')
+    >>> benchmark('sleep(t)', t=(1, 2, 3), setup='from time import sleep')
+
+    >>> shapes = (100, 10000, 1000000)
+    >>> setup = \"\"\"
+    ... import numpy as np
+    ... a = np.random.random_sample(shape)
+    ... \"\"\"
+    >>> b = benchmark('np.dot(a, a)', shape=shapes, setup=setup)
 
     >>> shapes = (10, 100, 1000)
-    >>> b = benchmark('np.dot(a, a)', shape=shapes,
-    ...               setup='import numpy as np;'
-    ...                     'a = np.random.random_sample(shape)')
-
-    >>> b = benchmark('np.dot(a, b)', m=shapes, n=shapes,
-    ...               setup='import numpy as np;'
-    ...                     'a = np.random.random_sample((m, n));'
-    ...                     'b = np.random.random_sample(n)')
+    >>> setup=\"\"\"
+    ... import numpy as np
+    ... a = np.random.random_sample((m, n))
+    ... b = np.random.random_sample(n)
+    ... \"\"\"
+    >>> b = benchmark('np.dot(a, b)', m=shapes, n=shapes, setup=setup)
 
     Overhead:
     >>> b = benchmark('pass')
@@ -130,6 +140,10 @@ def benchmark(stmts, *args, **keywords):
             ';\n'.join("{0}=keyword['{0}']".format(k) for k in keywords) +
             ';\n')
 
+    # compute column sizes
+    info_nspaces = _get_info_nspaces(args, keywords)
+
+    # iterate through the keyed inputs
     for iresult, (arg, keyword, stmt) in enumerate(iterinputs):
 
         if callable(stmt):
@@ -166,7 +180,7 @@ def benchmark(stmts, *args, **keywords):
         if do_memory:
             memory = memory_usage(since=memory)
 
-        info = _get_info(iresult, len(stmts), arg, keyword)
+        info = _get_info(iresult, len(stmts), arg, keyword, info_nspaces)
         usec = best * 1e6 / number
         if usec < 1:
             unit = 'ns'
@@ -182,14 +196,13 @@ def benchmark(stmts, *args, **keywords):
             value = usec / 1000000
 
         if verbose:
-            msg = '{0}{1}{2} loops, best of {3}: {4:.2f} {5} per loop.'.format(
+            msg = '{0}{1}{2} loops, best of {3}: {4:6.2f} {5} per loop'.format(
                 info, ': ' if info else '', number, repeat, value, unit)
         else:
-            msg = '{0}{1}{2:.2f} {3}.'.format(info, ': ' if info else '',
-                                              value, unit)
+            msg = '{0} {1:6.2f} {2}'.format(info, value, unit)
         if do_memory:
-            msg += ' ' + ', '.join(k + ':' + str(v) + 'MiB'
-                                   for k, v in memory.items())
+            msg += '. ' + ', '.join(k + ':' + str(v) + 'MiB'
+                                    for k, v in memory.items())
         print(msg)
 
         result['info'][iresult] = info
@@ -250,15 +263,22 @@ def memory_usage(keys=('VmRSS', 'VmData', 'VmSize'), since=None):
     return result
 
 
-def _get_info(istmt, nstmts, args, keywords):
+def _get_info(istmt, nstmts, args, keywords, info_nspaces):
     if nstmts > 1:
         length_stmt = str(len(str(nstmts)))
         info = ('{0:' + length_stmt + '}: ').format(istmt % nstmts + 1)
     else:
         info = ''
-    info += ', '.join([repr(a) for a in args] +
-                      ['{0}={1!r}'.format(k, v) for k, v in keywords.items()])
+    table = [repr(a) for a in args] + \
+            ['{0}={1!r}'.format(k, v) for k, v in keywords.items()]
+    info += ' '.join(('{0:' + str(n) + '}').format(i)
+                     for i, n in zip(table, info_nspaces))
     return info
+
+
+def _get_info_nspaces(args, keywords):
+    return len(args) * [0] + [max(len('{0}={1!r}'.format(k, _)) for _ in v)
+                              for k, v in keywords.items()]
 
 
 def _iterkeywords(keywords):
