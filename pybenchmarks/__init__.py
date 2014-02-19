@@ -171,11 +171,14 @@ def benchmark(stmts, *args, **keywords):
         gc.collect()
         if do_memory:
             memory = memory_usage()
-        if number > 1 or x < 0.1:
-            r = t.repeat(repeat, number)
+        if number == 1:
+            if x > 1:
+                repeat_ = int(repeat // x)
+            else:
+                repeat_ = repeat - 1
+            r = [x] + t.repeat(repeat_, 1)
         else:
-            r = t.repeat(repeat-1, number)
-            r = [x] + r
+            r = t.repeat(repeat, number)
         best = min(r)
         if do_memory:
             memory = memory_usage(since=memory)
@@ -197,7 +200,7 @@ def benchmark(stmts, *args, **keywords):
 
         if verbose:
             msg = '{0}{1}{2} loops, best of {3}: {4:6.2f} {5} per loop'.format(
-                info, ': ' if info else '', number, repeat, value, unit)
+                info, ': ' if info else '', number, len(r), value, unit)
         else:
             msg = '{0} {1:6.2f} {2}'.format(info, value, unit)
         if do_memory:
