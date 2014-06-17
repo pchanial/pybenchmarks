@@ -56,11 +56,12 @@ def benchmark(stmts, *args, **keywords):
     >>> from pybenchmarks import benchmark
     >>> f1 = np.empty
     >>> f2 = np.ones
-    >>> b = benchmark(['f1(n, dtype=dtype)', 'f2(n, dtype=dtype)'],
-    ...               dtype=(int, complex), n=(100, 10000, 1000000),
-    ...               setup='from __main__ import f1, f2')
+    >>> b = benchmark('f(n, dtype=dtype)', f=(f1, f2),
+    ...               dtype=(int, complex), n=(100, 10000, 1000000))
 
-    >>> benchmark('sleep(t)', t=(1, 2, 3), setup='from time import sleep')
+    >>> import time
+    >>> f = time.sleep
+    >>> benchmark('f(t)', t=(1, 2, 3), setup='from __main__ import f')
 
     >>> shapes = (100, 10000, 1000000)
     >>> setup = \"\"\"

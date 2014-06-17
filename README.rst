@@ -18,23 +18,24 @@ Examples
 >>> from pybenchmarks import benchmark
 >>> f1 = np.empty
 >>> f2 = np.ones
->>> b = benchmark(['f1(n, dtype=dtype)', 'f2(n, dtype=dtype)'],
-...               dtype=(int, complex), n=(100, 10000, 1000000),
-...               setup='from __main__ import f1, f2')
-1: dtype=<type 'int'>     n=100       1.44 us
-2: dtype=<type 'int'>     n=100       3.15 us
-1: dtype=<type 'complex'> n=100       1.20 us
-2: dtype=<type 'complex'> n=100       3.16 us
-1: dtype=<type 'int'>     n=10000     1.60 us
-2: dtype=<type 'int'>     n=10000     6.74 us
-1: dtype=<type 'complex'> n=10000     1.40 us
-2: dtype=<type 'complex'> n=10000    12.77 us
-1: dtype=<type 'int'>     n=1000000   1.68 us
-2: dtype=<type 'int'>     n=1000000   1.86 ms
-1: dtype=<type 'complex'> n=1000000   1.22 us
-2: dtype=<type 'complex'> n=1000000   3.96 ms
+>>> b = benchmark('f(n, dtype=dtype)', f=(f1, f2),
+...               dtype=(int, complex), n=(100, 10000, 1000000))
+dtype=int     f=empty n=100       1.48 us
+dtype=complex f=empty n=100       1.35 us
+dtype=int     f=ones  n=100       5.29 us
+dtype=complex f=ones  n=100       4.15 us
+dtype=int     f=empty n=10000     1.21 us
+dtype=complex f=empty n=10000     1.82 us
+dtype=int     f=ones  n=10000     9.61 us
+dtype=complex f=ones  n=10000    12.55 us
+dtype=int     f=empty n=1000000   2.57 us
+dtype=complex f=empty n=1000000   1.18 us
+dtype=int     f=ones  n=1000000   2.41 ms
+dtype=complex f=ones  n=1000000   5.16 ms
 
->>> benchmark('sleep(t)', t=(1, 2, 3), setup='from time import sleep')
+>>> import time
+>>> f = time.sleep
+>>> benchmark('f(t)', t=(1, 2, 3), setup='from __main__ import f')
 t=1   1.00 s
 t=2   2.00 s
 t=3   3.00 s
