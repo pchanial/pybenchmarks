@@ -9,6 +9,7 @@ import gc
 import itertools
 import numpy as np
 import os
+import re
 import timeit
 try:
     from collections import OrderedDict
@@ -19,6 +20,7 @@ __all__ = ['benchmark']
 __version__ = '2.1'
 
 keyword = {}
+refortran = re.compile('^([a-z0-9,_ ]+ = )?([a-z0-9_]+)\(', re.I)
 
 
 def benchmark(stmts, *args, **keywords):
@@ -273,15 +275,28 @@ def _get_info(istmt, nstmts, args, keywords, info_nspaces):
     else:
         info = ''
     table = [repr(a) for a in args] + \
-            ['{0}={1!r}'.format(k, v) for k, v in keywords.items()]
+            ['{0}={1}'.format(k, _get_str(v)) for k, v in keywords.items()]
     info += ' '.join(('{0:' + str(n) + '}').format(i)
                      for i, n in zip(table, info_nspaces))
     return info
 
 
+def _get_str(v):
+    try:
+        return v.__name__
+    except AttributeError:
+        pass
+    if type(v).__name__ == 'fortran':
+        try:
+            return refortran.match(v.__doc__).group(2)
+        except AttributeError:
+            return 'fortran'
+    return repr(v)
+
+
 def _get_info_nspaces(args, keywords):
-    return len(args) * [0] + [max(len('{0}={1!r}'.format(k, _)) for _ in v)
-                              for k, v in keywords.items()]
+    return len(args) * [0] + [max(len('{0}={1}'.format(k, _get_str(_)))
+                                  for _ in v) for k, v in keywords.items()]
 
 
 def _iterkeywords(keywords):
