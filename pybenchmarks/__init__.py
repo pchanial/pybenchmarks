@@ -34,10 +34,10 @@ def benchmark(stmts, *args, **keywords):
 
     Parameters
     ----------
-    stmts : string, or sequence of
-        The code snippet(s) to be timed. The input keywords are iterated
-        and their values are passed to the code string by using the keyword
-        name.
+    stmts : string, callable, or sequence of
+        The code snippet(s) or functions to be timed. The input arguments and
+        keywords are iterated and their values are passed to the function or
+        the code snippet.
     repeat : int, optional
         Number of times the timing is repeated (default: 3).
     maxloop : int, optional
@@ -47,35 +47,37 @@ def benchmark(stmts, *args, **keywords):
         the same mechanism as the stmt argument.
     memory_usage : boolean, optional
         If True, print memory usage (default is False)
-    verbose : boolean, optional
-        If True, print number of loops and repeats.
+    verbose : boolean or integer, optional
+        If False (or 0), don't print the benchmark results. If 2, also print
+        the number of loops and repeats. Default is True (or 1).
 
     Examples
     --------
     >>> import numpy as np
     >>> from pybenchmarks import benchmark
-    >>> f1 = np.empty
-    >>> f2 = np.ones
-    >>> b = benchmark('f(n, dtype=dtype)', f=(f1, f2),
+    >>> b = benchmark('f(n, dtype=dtype)', f=(np.empty, np.ones),
     ...               dtype=(int, complex), n=(100, 10000, 1000000))
+    >>> b = benchmark((np.empty, np.ones), (100, 10000, 1000000),
+    ...               dtype=(int, complex))
 
     >>> import time
     >>> f = time.sleep
+    >>> benchmark(f, (1, 2, 3))
     >>> benchmark('f(t)', t=(1, 2, 3), setup='from __main__ import f')
 
     >>> shapes = (100, 10000, 1000000)
-    >>> setup = \"\"\"
+    >>> setup = '''
     ... import numpy as np
     ... a = np.random.random_sample(shape)
-    ... \"\"\"
+    ... '''
     >>> b = benchmark('np.dot(a, a)', shape=shapes, setup=setup)
 
     >>> shapes = (10, 100, 1000)
-    >>> setup=\"\"\"
+    >>> setup='''
     ... import numpy as np
     ... a = np.random.random_sample((m, n))
     ... b = np.random.random_sample(n)
-    ... \"\"\"
+    ... '''
     >>> b = benchmark('np.dot(a, b)', m=shapes, n=shapes, setup=setup)
 
     Overhead:
