@@ -81,7 +81,7 @@ def benchmark(stmts, *args, **keywords):
     >>> b = benchmark('np.dot(a, b)', m=shapes, n=shapes, setup=setup)
 
     Overhead:
-    >>> b = benchmark('pass')
+    >>> b = benchmark('pass', verbose=2)
 
     """
     global keyword
@@ -106,7 +106,7 @@ def benchmark(stmts, *args, **keywords):
     maxloop = keywords.pop('maxloop', 100)
     if maxloop < 1:
         raise ValueError('Invalid value for maxloop.')
-    verbose = keywords.pop('verbose', False)
+    verbose = keywords.pop('verbose', True)
 
     # ensure args is a sequence of sequences
     args = tuple(a if isinstance(a, (list, tuple)) else [a] for a in args)
@@ -191,29 +191,30 @@ def benchmark(stmts, *args, **keywords):
             memory = memory_usage(since=memory)
 
         info = _get_info(iresult, len(stmts), arg, keyword, info_nspaces)
-        usec = best * 1e6 / number
-        if usec < 1:
-            unit = 'ns'
-            value = usec * 1000
-        elif usec < 1000:
-            unit = 'us'
-            value = usec
-        elif usec < 1000000:
-            unit = 'ms'
-            value = usec / 1000
-        else:
-            unit = 's'
-            value = usec / 1000000
-
-        if verbose:
-            msg = '{0}{1}{2} loops, best of {3}: {4:6.2f} {5} per loop'.format(
-                info, ': ' if info else '', number, len(r), value, unit)
-        else:
-            msg = '{0} {1:6.2f} {2}'.format(info, value, unit)
-        if do_memory:
-            msg += '. ' + ', '.join(k + ':' + str(v) + 'MiB'
-                                    for k, v in memory.items())
-        print(msg)
+        if verbose > 0:
+            usec = best * 1e6 / number
+            if usec < 1:
+                unit = 'ns'
+                value = usec * 1000
+            elif usec < 1000:
+                unit = 'us'
+                value = usec
+            elif usec < 1000000:
+                unit = 'ms'
+                value = usec / 1000
+            else:
+                unit = 's'
+                value = usec / 1000000
+            if verbose == 1:
+                msg = '{0} {1:6.2f} {2}'.format(info, value, unit)
+            else:
+                msg = '{0}{1}{2} loops, best of {3}: {4:6.2f} {5} per loop' \
+                    .format(info, ': ' if info else '', number, len(r), value,
+                            unit)
+            if do_memory:
+                msg += '. ' + ', '.join(k + ':' + str(v) + 'MiB'
+                                        for k, v in memory.items())
+            print(msg)
 
         result['info'][iresult] = info
         result['time'][iresult] = best / number
