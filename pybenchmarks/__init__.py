@@ -280,7 +280,7 @@ def _get_info(istmt, nstmts, args, keywords, info_nspaces):
         info = ('{0:' + length_stmt + '}: ').format(istmt % nstmts + 1)
     else:
         info = ''
-    table = [repr(a) for a in args] + \
+    table = [_get_str(_) for _ in args] + \
             ['{0}={1}'.format(k, _get_str(v)) for k, v in keywords.items()]
     info += ' '.join(('{0:' + str(n) + '}').format(i)
                      for i, n in zip(table, info_nspaces))
@@ -297,12 +297,18 @@ def _get_str(v):
             return refortran.match(v.__doc__).group(2)
         except AttributeError:
             return 'fortran'
-    return repr(v)
+    elif isinstance(v, np.dtype):
+        return str(v)
+    out = repr(v)
+    if len(out) > 15:
+        out = out[:15] + '...'
+    return out
 
 
 def _get_info_nspaces(args, keywords):
-    return len(args) * [0] + [max(len('{0}={1}'.format(k, _get_str(_)))
-                                  for _ in v) for k, v in keywords.items()]
+    return [max(len(_get_str(_)) for _ in arg) for arg in args] + \
+           [max(len('{0}={1}'.format(k, _get_str(_)))
+                for _ in v) for k, v in keywords.items()]
 
 
 def _iterkeywords(keywords):
