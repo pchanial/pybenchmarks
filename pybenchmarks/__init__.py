@@ -17,7 +17,7 @@ except ImportError:
     from ordereddict import OrderedDict
 
 __all__ = ['benchmark']
-__version__ = '2.2'
+__version__ = '2.3'
 
 keyword = {}
 refortran = re.compile('^([a-z0-9,_ ]+ = )?([a-z0-9_]+)\(', re.I)
