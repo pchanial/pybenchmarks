@@ -88,6 +88,9 @@ def benchmark(stmts, *args, **keywords):
 
     if callable(stmts) or isinstance(stmts, str):
         stmts = (stmts,)
+        shape_stmts = ()
+    else:
+        shape_stmts = (len(stmts),)
     if any(not callable(_) and not isinstance(_, str) for _ in stmts):
         raise TypeError(
             'The argument stmts is not a string not a sequence of strings.')
@@ -117,8 +120,7 @@ def benchmark(stmts, *args, **keywords):
     iterkeys = _iterkeywords(keywords)
     iterinputs = itertools.product(iterargs, iterkeys, stmts)
     shape = tuple(len(_) for _ in reversed(args)) + \
-            tuple(len(_) for _ in reversed(keywords.values())) + \
-            (len(stmts),)
+            tuple(len(_) for _ in reversed(keywords.values())) + shape_stmts
     nbenches = np.product(shape)
 
     variables = OrderedDict({'stmts': stmts})
