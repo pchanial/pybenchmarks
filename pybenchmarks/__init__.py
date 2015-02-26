@@ -20,7 +20,7 @@ except ImportError:
 if sys.version_info.major > 2:
     types.XRangeType = range
 __all__ = ['benchmark']
-__version__ = '2.3'
+__version__ = '2.4'
 
 _keyword = {}
 _refortran = re.compile('^([a-z0-9,_ ]+ = )?([a-z0-9_]+)\(', re.I)
