@@ -22,8 +22,8 @@ if sys.version_info.major > 2:
 __all__ = ['benchmark']
 __version__ = '2.3'
 
-keyword = {}
-refortran = re.compile('^([a-z0-9,_ ]+ = )?([a-z0-9_]+)\(', re.I)
+_keyword = {}
+_refortran = re.compile('^([a-z0-9,_ ]+ = )?([a-z0-9_]+)\(', re.I)
 _itertypes = (list, tuple, types.GeneratorType, types.XRangeType)
 
 
@@ -96,7 +96,7 @@ def benchmark(stmts, *args, **keywords):
     >>> b = benchmark('pass', verbose=2)
 
     """
-    global keyword
+    global _keyword
 
     if callable(stmts) or isinstance(stmts, str):
         stmts = (stmts,)
@@ -162,8 +162,8 @@ def benchmark(stmts, *args, **keywords):
 
     if len(keywords) > 0:
         setup_init = (
-            'from pybenchmarks import keyword;' +
-            ';\n'.join("{0}=keyword['{0}']".format(k) for k in keywords) +
+            'from pybenchmarks import _keyword;' +
+            ';\n'.join("{0}=_keyword['{0}']".format(k) for k in keywords) +
             ';\n')
     else:
         setup_init = ''
@@ -172,7 +172,7 @@ def benchmark(stmts, *args, **keywords):
     info_nspaces = _get_info_nspaces(stmts, argsloop, keywordsloop)
 
     # iterate through the keyed inputs
-    for iresult, (arg, keyword, stmt) in enumerate(iterinputs):
+    for iresult, (arg, _keyword, stmt) in enumerate(iterinputs):
 
         if callable(stmt):
             class wrapper(object):
@@ -180,7 +180,7 @@ def benchmark(stmts, *args, **keywords):
                     stmt(*self.args, **self.keywords)
             w = wrapper()
             w.args = arg
-            w.keywords = keyword
+            w.keywords = _keyword
             t = timeit.Timer(w, setup=setup)
         else:
             t = timeit.Timer(stmt, setup=setup_init + setup)
@@ -214,7 +214,7 @@ def benchmark(stmts, *args, **keywords):
         stmloop = None if len(shape_stmts) == 0 else stmt
         argloop = tuple(_ for _, l in zip(arg, isloopa) if l)
         keyloop = OrderedDict(
-            (k, v) for (k, v), l in zip(keyword.items(), isloopk) if l)
+            (k, v) for (k, v), l in zip(_keyword.items(), isloopk) if l)
         info = _get_info(stmloop, argloop, keyloop, info_nspaces)
         if verbose > 0:
             usec = best * 1e6 / number
@@ -318,7 +318,7 @@ def _get_str(v):
         pass
     if type(v).__name__ == 'fortran':
         try:
-            return refortran.match(v.__doc__).group(2)
+            return _refortran.match(v.__doc__).group(2)
         except AttributeError:
             return 'fortran'
     elif isinstance(v, np.dtype):
