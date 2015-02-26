@@ -337,7 +337,8 @@ def _get_info_nspaces(stmts, args, keywords):
 
 
 def _iterkeywords(keywords):
-    keys = keywords.keys()[::-1]
-    itervalues = itertools.product(*keywords.values()[::-1])
+    # iterate first the last keywords (in alphanumeric order)
+    itervalues = itertools.product(*tuple(keywords.values())[::-1])
     for values in itervalues:
-        yield OrderedDict((k, v) for k, v in zip(keys, values)[::-1])
+        yield OrderedDict((k, v) for k, v in zip(keywords.keys(),
+                                                 values[::-1]))
