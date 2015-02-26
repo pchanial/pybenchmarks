@@ -11,26 +11,31 @@ import numpy as np
 import os
 import re
 import timeit
+import types
+import sys
 try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
-
+if sys.version_info.major > 2:
+    types.XRangeType = range
 __all__ = ['benchmark']
 __version__ = '2.3'
 
 keyword = {}
 refortran = re.compile('^([a-z0-9,_ ]+ = )?([a-z0-9_]+)\(', re.I)
+_itertypes = (list, tuple, types.GeneratorType, types.XRangeType)
 
 
 def benchmark(stmts, *args, **keywords):
     """
     Automate the creation of benchmark tables.
 
-    This function times one or more code snippets by iterating through
-    sequences of keyed input variables. It returns a dictionary containing
-    the elapsed time (all platforms) and memory usage (linux only) for each
-    combination of the input variables.
+    This function times one or more code snippets or functions by iterating
+    through input arguments or keyed variables. It returns a dictionary
+    containing the elapsed time (all platforms) and memory usage (linux only)
+    for each combination of the input variables. An argument or keyed variable
+    is iterated if and only if it is a list, a tuple, a generator or a range.
 
     Parameters
     ----------
@@ -80,6 +85,13 @@ def benchmark(stmts, *args, **keywords):
     ... '''
     >>> b = benchmark('np.dot(a, b)', m=shapes, n=shapes, setup=setup)
 
+    >>> def f(x, n, start=1):
+    ...     out = start
+    ...     for i in range(n):
+    ...         out *= x
+    ...     return out
+    >>> b = benchmark(f, np.full(10, 2), xrange(10), start=2.)
+
     Overhead:
     >>> b = benchmark('pass', verbose=2)
 
@@ -109,18 +121,25 @@ def benchmark(stmts, *args, **keywords):
     verbose = keywords.pop('verbose', True)
 
     # ensure args is a sequence of sequences
-    args = tuple(a if isinstance(a, (list, tuple)) else [a] for a in args)
+    isloopa = tuple(isinstance(a, _itertypes) for a in args)
+    args = tuple(tuple(a) if loop else [a] for a, loop in zip(args, isloopa))
+    argsloop = tuple(_ for _, l in zip(args, isloopa) if l)
+
     # ensure keywords is a dict of sequences
-    keywords = OrderedDict((str(k), keywords[k]
-                            if isinstance(keywords[k], (list, tuple))
-                            else [keywords[k]])
-                           for k in sorted(keywords.keys()))
+    keys = sorted(keywords.keys())
+    isloopk = tuple(isinstance(keywords[k], _itertypes) for k in keys)
+    keywords = OrderedDict((str(k), tuple(keywords[k])
+                            if loop else [keywords[k]])
+                           for k, loop in zip(keys, isloopk))
+    keywordsloop = OrderedDict(
+        (k, v) for (k, v), l in zip(keywords.items(), isloopk) if l)
 
     iterargs = itertools.product(*args)
     iterkeys = _iterkeywords(keywords)
     iterinputs = itertools.product(iterargs, iterkeys, stmts)
-    shape = tuple(len(_) for _ in reversed(args)) + \
-            tuple(len(_) for _ in reversed(keywords.values())) + shape_stmts
+    shape = tuple(len(_) for _ in reversed(argsloop)) + \
+            tuple(len(_) for _ in reversed(keywordsloop.values())) + \
+            shape_stmts
     nbenches = np.product(shape)
 
     variables = OrderedDict({'stmts': stmts})
@@ -150,7 +169,7 @@ def benchmark(stmts, *args, **keywords):
         setup_init = ''
 
     # compute column sizes
-    info_nspaces = _get_info_nspaces(args, keywords)
+    info_nspaces = _get_info_nspaces(stmts, argsloop, keywordsloop)
 
     # iterate through the keyed inputs
     for iresult, (arg, keyword, stmt) in enumerate(iterinputs):
@@ -192,7 +211,11 @@ def benchmark(stmts, *args, **keywords):
         if do_memory:
             memory = memory_usage(since=memory)
 
-        info = _get_info(iresult, len(stmts), arg, keyword, info_nspaces)
+        stmloop = None if len(shape_stmts) == 0 else stmt
+        argloop = tuple(_ for _, l in zip(arg, isloopa) if l)
+        keyloop = OrderedDict(
+            (k, v) for (k, v), l in zip(keyword.items(), isloopk) if l)
+        info = _get_info(stmloop, argloop, keyloop, info_nspaces)
         if verbose > 0:
             usec = best * 1e6 / number
             if usec < 1:
@@ -276,16 +299,15 @@ def memory_usage(keys=('VmRSS', 'VmData', 'VmSize'), since=None):
     return result
 
 
-def _get_info(istmt, nstmts, args, keywords, info_nspaces):
-    if nstmts > 1:
-        length_stmt = str(len(str(nstmts)))
-        info = ('{0:' + length_stmt + '}: ').format(istmt % nstmts + 1)
+def _get_info(stmt, args, keywords, info_nspaces):
+    if stmt is not None:
+        info = ('{0:' + str(info_nspaces[0]) + '}: ').format(_get_str(stmt))
     else:
         info = ''
     table = [_get_str(_) for _ in args] + \
             ['{0}={1}'.format(k, _get_str(v)) for k, v in keywords.items()]
     info += ' '.join(('{0:' + str(n) + '}').format(i)
-                     for i, n in zip(table, info_nspaces))
+                     for i, n in zip(table, info_nspaces[1:]))
     return info
 
 
@@ -307,8 +329,9 @@ def _get_str(v):
     return out
 
 
-def _get_info_nspaces(args, keywords):
-    return [max(len(_get_str(_)) for _ in arg) for arg in args] + \
+def _get_info_nspaces(stmts, args, keywords):
+    return [max(len(_get_str(_)) for _ in stmts)] + \
+           [max(len(_get_str(_)) for _ in arg) for arg in args] + \
            [max(len('{0}={1}'.format(k, _get_str(_)))
                 for _ in v) for k, v in keywords.items()]
 
