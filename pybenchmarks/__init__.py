@@ -146,6 +146,8 @@ def benchmark(stmts, *args, **keywords):
             'from pybenchmarks import keyword;' +
             ';\n'.join("{0}=keyword['{0}']".format(k) for k in keywords) +
             ';\n')
+    else:
+        setup_init = ''
 
     # compute column sizes
     info_nspaces = _get_info_nspaces(args, keywords)
